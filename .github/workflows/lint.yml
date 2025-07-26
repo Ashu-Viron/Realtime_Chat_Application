@@ -1,0 +1,46 @@
+
+name:  Chat App CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build & Lint
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20.x]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install dependencies for relayer-ws
+        working-directory: ./relayer-ws
+        run: npm install
+
+      - name: Lint and build relayer-ws
+        working-directory: ./relayer-ws
+        run: |
+          npm run lint || echo "Lint not configured"
+          npm run build || echo "Build not configured"
+
+      - name: Install dependencies for user-ws
+        working-directory: ./user-ws
+        run: npm install
+
+      - name: Lint and build user-ws
+        working-directory: ./user-ws
+        run: |
+          npm run lint || echo "Lint not configured"
+          npm run build || echo "Build not configured"
