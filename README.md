@@ -1,4 +1,4 @@
-```md
+````md
 # 📡 Real-Time Chat Application
 
 This is a real-time chat application built using **WebSocket** architecture with a **Relayer Server** and **User WebSocket Server**. It supports **room-based messaging**, allowing users to join specific chat rooms and receive only relevant messages.
@@ -106,6 +106,7 @@ The frontend should:
 - Add persistent chat storage (MongoDB, Redis, etc.)  
 - Frontend UI  
 - Unit tests  
+- Web3/Nibiru integration for wallet-based login and NIBI token tipping  
 
 ---
 
@@ -113,4 +114,3 @@ The frontend should:
 
 **Ashutosh Raj**  
 Built with ❤️ using TypeScript + WebSocket
-```
