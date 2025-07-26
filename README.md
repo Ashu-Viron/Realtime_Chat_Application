@@ -124,6 +124,11 @@ await sendTokens(fromWallet, toWallet, '10nibi');
 ```
 
 ---
+## Demo Video
+
+
+https://github.com/user-attachments/assets/e86a76b5-4fc9-4109-bdd3-787a287d2654
+
 
 ## 🛠️ TODO
 
