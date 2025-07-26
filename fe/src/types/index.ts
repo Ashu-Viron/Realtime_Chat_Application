@@ -23,8 +23,9 @@ export interface User {
 
 export interface WebSocketMessage {
   id?: string;
-  type: 'join-room' | 'chat' | 'user-joined' | 'user-left' | 'room-users';
+  type: 'join-room' | 'chat' | 'user-joined' | 'user-left' | 'room-users'|'room-list'|'room-created';
   room?: string;
+    rooms?: string[]; // ✅ <-- Add this line
   message?: string;
   sender?: string;
   users?: string[];

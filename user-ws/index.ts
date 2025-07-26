@@ -9,147 +9,264 @@ interface Room {
 }
 
 const RELAYER_URL = "ws://localhost:3001";
-const relayerSocket = new WebSocket(RELAYER_URL);
+let relayerSocket: WebSocket | null = null;
 const rooms: Record<string, Room> = {};
 const socketToUsername = new Map<WebSocketWsType, string>();
+const socketToRooms = new Map<WebSocketWsType, Set<string>>();
 
-// Helper function to safely get or create a room
-function getOrCreateRoom(roomName: string): Room {
-    if (!rooms[roomName]) {
-        rooms[roomName] = { sockets: [], users: [] };
+// Connect to relayer with robust reconnect logic
+function connectToRelayer() {
+    if (relayerSocket) relayerSocket.close();
+    
+    relayerSocket = new WebSocket(RELAYER_URL);
+    
+    relayerSocket.onopen = () => {
+        console.log('✅ Connected to relayer');
+    };
+    
+    relayerSocket.onerror = (error) => {
+        console.error('❌ Relayer connection error:', error);
+        setTimeout(connectToRelayer, 2000);
+    };
+    
+    relayerSocket.onclose = () => {
+        console.log('🔌 Relayer connection closed. Reconnecting...');
+        setTimeout(connectToRelayer, 2000);
+    };
+    
+relayerSocket.onmessage = async ({ data }) => {
+  try {
+    let text: string;
+
+    if (typeof data === 'string') {
+      text = data;
+    } else if (data instanceof Buffer) {
+      text = data.toString();
+    } else if (data instanceof Blob) {
+      text = await data.text(); // <- handle Blob from undici
+    } else {
+      console.warn('Unknown data type received from relayer:', typeof data);
+      return;
     }
-    return rooms[roomName];
+
+    const message = JSON.parse(text);
+    console.log("📥 Relayer message received:", message);
+
+    if (message.room) {
+      const roomName = message.room.toLowerCase();
+      const room = rooms[roomName];
+
+      if (room) {
+        // console.log(`📤 Broadcasting to ${room.sockets.length} users in ${roomName}`);
+        broadcastToRoom(roomName, message);
+      } else {
+        console.log(`❌ Room ${roomName} not found for broadcasting`);
+      }
+    }
+
+    if (message.type === 'room-created' && message.room) {
+    const roomName = message.room.toLowerCase();
+    // Ensure the room is created locally if not exists
+  const isNewRoom = !rooms[roomName];
+    getOrCreateRoom(roomName,false); // this will create room and broadcast room-list
+    if (isNewRoom) {
+    console.log(`🛠️ Room created from relayer: ${roomName}`);
+    broadcastRoomList(); // <- 🔥 THIS IS WHAT WAS MISSING
+  }
+    }
+  } catch (err) {
+    console.error("❌ Error handling relayer message:", err);
+  }
+};
 }
 
-relayerSocket.onmessage = async ({ data }) => {
-    let jsonString: string;
+// Initialize connection
+connectToRelayer();
 
-    try {
-        if (data instanceof Blob) {
-            jsonString = await data.text();
-        } else if (typeof data === 'string') {
-            jsonString = data;
-        } else if (data instanceof ArrayBuffer) {
-            jsonString = Buffer.from(data).toString('utf8');
-        } else {
-            throw new Error('Unsupported data format received in relayerSocket');
-        }
-
-        const parsedData = JSON.parse(jsonString);
-        console.log("Parsed Data:", parsedData);
-
-        if (parsedData.room) {
-            const room = rooms[parsedData.room];
-            if (room) {
-                room.sockets.forEach(socket => {
-                    if (socket.readyState === socket.OPEN) {
-                        socket.send(jsonString);
-                    }
-                });
-            }
-        }
-    } catch (err) {
-        console.error("Error handling relayerSocket message:", err);
+// Get or create room with strict normalization
+function getOrCreateRoom(roomName: string,shouldBroadcast = true): Room {
+    const normalizedRoom = roomName.toLowerCase().trim();
+    
+    if (!rooms[normalizedRoom]) {
+        rooms[normalizedRoom] = { sockets: [], users: [] };
+        if (shouldBroadcast) broadcastRoomList();
+        console.log(`🆕 Created room: ${normalizedRoom}`);
     }
-};
+    
+    return rooms[normalizedRoom];
+}
 
-// Helper function to broadcast to room
+// Broadcast to room without modifying message
 function broadcastToRoom(roomName: string, message: any) {
-    const room = rooms[roomName];
-    if (!room) return;
-
-    const messageWithId = {
-        ...message,
-        id: uuidv4()
-    };
-
+    const normalizedRoom = roomName.toLowerCase().trim();
+    const room = rooms[normalizedRoom];
+    
+    if (!room) {
+        console.log(`❌ Broadcast failed: Room ${normalizedRoom} not found`);
+        return;
+    }
+    
+    console.log(`📢 Broadcasting to ${room.sockets.length} users in ${normalizedRoom}:`, message);
+    
+    const messageString = JSON.stringify(message);
     room.sockets.forEach(socket => {
         if (socket.readyState === socket.OPEN) {
-            socket.send(JSON.stringify(messageWithId));
+            const username = socketToUsername.get(socket) || 'unknown';
+            console.log(`   → Sending to ${username}`);
+            socket.send(messageString);
+        } else {
+            console.log(`   → Socket closed for ${socketToUsername.get(socket)}`);
         }
     });
 }
+//////////////////////new////////////
+function broadcastRoomList() {
+      const roomNames = Object.keys(rooms);
+  const message = JSON.stringify({ type: 'room-list', rooms: roomNames, });
 
-wss.on('connection', function connection(ws) {
-    ws.on('error', console.error);
+  wss.clients.forEach(client => {
+    if (client.readyState === client.OPEN) {
+      client.send(message);
+    }
+  });
+    console.log(`[Server] Broadcasted room list: ${roomNames.join(', ')}`);
+}
+/////////////////
 
-    ws.on('message', function message(data: string) {
+wss.on('connection', (ws) => {
+    console.log('👤 New connection');
+    socketToRooms.set(ws, new Set());
+    
+    ws.on('error', (error) => {
+        console.error('❌ Connection error:', error);
+    });
+
+    ws.on('message', (data: string) => {
         try {
-            const parsedData = JSON.parse(data);
+            console.log("📨 Received:", data);
+            const message = JSON.parse(data);
             
-            if (parsedData.type === "join-room" && parsedData.room && parsedData.sender) {
-                const roomName = parsedData.room;
-                const username = parsedData.sender;
-                const room = getOrCreateRoom(roomName);
+            // Handle join-room messages
+            if (message.type === "join-room" && message.room && message.sender) {
+                const roomName = message.room.toLowerCase().trim();
+                const username = message.sender;
+                const isNewRoom = !rooms[roomName];//new
+                const room = getOrCreateRoom(roomName,true);
+                broadcastRoomList()//new
                 
-                // Store username for this socket
-                socketToUsername.set(ws, username);
-                
-                // Add socket to room if not already present
-                if (!room.sockets.includes(ws)) {
-                    room.sockets.push(ws);
+                //new
+                if (isNewRoom && relayerSocket?.readyState === WebSocket.OPEN) {
+                relayerSocket.send(JSON.stringify({
+                    type: 'room-created',
+                    room: roomName,
+                    id: uuidv4(),
+                }));
                 }
+                //new
+
+                // Store user info
+                socketToUsername.set(ws, username);
+                socketToRooms.get(ws)?.add(roomName);
                 
-                // Add user to room if not already present
+                // Add to room if new
                 if (!room.users.includes(username)) {
                     room.users.push(username);
+                    // console.log(`👋 ${username} joined ${roomName}`);
+                }
+                
+                // Add socket if new
+                if (!room.sockets.includes(ws)) {
+                    room.sockets.push(ws);
+                    // console.log(`➕ Socket added to ${roomName}`);
+                }
+                
+                // Notify room about new user
+                broadcastToRoom(roomName, {
+                    type: 'user-joined',
+                    sender: username,
+                    room: roomName,
+                    id: uuidv4()
+                });
+                
+                // Send updated user list
+                broadcastToRoom(roomName, {
+                    type: 'room-users',
+                    users: room.users,
+                    room: roomName,
+                    id: uuidv4()
+                });
+            }
+            // Handle chat messages
+            else if (message.type === 'chat' && message.room && message.sender) {
+                const roomName = message.room.toLowerCase().trim();
+                
+                // Add unique ID if missing
+                if (!message.id) message.id = uuidv4();
+                
+                // console.log(`💬 Chat message for ${roomName} from ${message.sender}`);
+                
+                // Forward to relayer
+                if (relayerSocket?.readyState === WebSocket.OPEN) {
+                    console.log("📤 Forwarding to relayer");
+                    relayerSocket.send(JSON.stringify(message));
+                } else {
+                    console.log("❌ Relayer not connected, broadcasting locally");
+                    broadcastToRoom(roomName, message);
+                }
+            }
+        } catch (err) {
+            console.error("❌ Message processing error:", err);
+        }
+    });
+
+    ws.on('close', () => {
+        console.log('👋 Connection closed');
+        const username = socketToUsername.get(ws);
+        
+        if (username) {
+            const userRooms = Array.from(socketToRooms.get(ws) || []);
+            
+            userRooms.forEach(roomName => {
+                const room = rooms[roomName];
+                if (!room) return;
+                
+                // Remove user
+                const userIndex = room.users.indexOf(username);
+                if (userIndex !== -1) {
+                    room.users.splice(userIndex, 1);
+                    // console.log(`👋 ${username} left ${roomName}`);
                     
-                    // Notify others about new user
+                    // Remove socket
+                    const socketIndex = room.sockets.indexOf(ws);
+                    if (socketIndex !== -1) room.sockets.splice(socketIndex, 1);
+                    
+                    // Notify room
                     broadcastToRoom(roomName, {
-                        type: 'user-joined',
+                        type: 'user-left',
                         sender: username,
-                        room: roomName
+                        room: roomName,
+                        id: uuidv4()
                     });
                     
                     // Send updated user list
                     broadcastToRoom(roomName, {
                         type: 'room-users',
                         users: room.users,
-                        room: roomName
+                        room: roomName,
+                        id: uuidv4()
                     });
+                    
+                    // Clean up empty rooms
+                    if (room.sockets.length === 0) {
+                        broadcastRoomList() //new
+                        console.log(`🧹 Cleaning empty room: ${roomName}`);
+                        delete rooms[roomName];
+                    }
                 }
-            }
-            
-            // Always send to relayer
-            if (relayerSocket.readyState === relayerSocket.OPEN) {
-                relayerSocket.send(JSON.stringify(parsedData));
-            }
-        } catch (err) {
-            console.error("Error processing message:", err);
+            });
         }
-    });
-
-    ws.on('close', () => {
-        const username = socketToUsername.get(ws);
-        socketToUsername.delete(ws);
         
-        if (!username) return;
-
-        Object.entries(rooms).forEach(([roomName, room]) => {
-            const userIndex = room.users.indexOf(username);
-            const socketIndex = room.sockets.indexOf(ws);
-
-            if (userIndex !== -1) {
-                room.users.splice(userIndex, 1);
-            }
-
-            if (socketIndex !== -1) {
-                room.sockets.splice(socketIndex, 1);
-            }
-
-            if (userIndex !== -1) {
-                broadcastToRoom(roomName, {
-                    type: 'user-left',
-                    sender: username,
-                    room: roomName
-                });
-
-                broadcastToRoom(roomName, {
-                    type: 'room-users',
-                    users: room.users,
-                    room: roomName
-                });
-            }
-        });
+        socketToUsername.delete(ws);
+        socketToRooms.delete(ws);
     });
 });
