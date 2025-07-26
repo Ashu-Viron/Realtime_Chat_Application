@@ -1,4 +1,3 @@
-```md
 # 📡 Real-Time Chat Application
 
 This is a real-time chat application built using **WebSocket** architecture with a **Relayer Server** and **User WebSocket Server**. It supports **room-based messaging**, allowing users to join specific chat rooms and receive only relevant messages.
@@ -100,18 +99,43 @@ The frontend should:
 
 ---
 
+## 🔮 Web3: Nibiru Integration (Future Scope)
+
+You can integrate [Nibiru Wallet](https://docs.nibiru.fi) to add web3 features:
+
+### 🔐 Wallet-Based Login
+
+Let users connect their Nibiru wallet to authenticate:
+
+- Integrate wallet connect SDK
+- On connect, get wallet address and treat it as the unique user ID
+
+### 🎁 Tip with NIBI Token
+
+Let users tip others in chat:
+
+- Integrate Nibiru token transfer using `@cosmjs`
+- Use recipient wallet address from user metadata
+- Trigger tip via UI button
+
+```ts
+// Sample logic (pseudocode)
+await sendTokens(fromWallet, toWallet, '10nibi');
+```
+
+---
+
 ## 🛠️ TODO
 
 - Add authentication & validation  
 - Add persistent chat storage (MongoDB, Redis, etc.)  
 - Frontend UI  
 - Unit tests  
-- Web3/Nibiru integration for wallet-based login and NIBI token tipping  
+- Web3/Nibiru integration  
 
 ---
 
 ## 🧑‍💻 Author
 
 **Ashutosh Raj**  
-Built with ❤️ using TypeScript + WebSocket
-```
+Built with ❤️ using TypeScript + WebSocket + React
