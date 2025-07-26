@@ -7,11 +7,14 @@ interface SidebarProps {
   currentRoom: string;
   username: string;
   isConnected: boolean;
+   joinedRooms: string[];  // rooms this user has joined
   roomUsers: string[];
   isDark: boolean;
   onRoomChange: (room: string) => void;
   onCreateRoom: (room: string) => void;
   onToggleTheme: () => void;
+   onJoinRoom: (room: string) => void;
+   joinableRooms: string[];
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -19,24 +22,43 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentRoom,
   username,
   isConnected,
+  // joinedRooms, // new
   roomUsers,
   isDark,
   onRoomChange,
   onCreateRoom,
   onToggleTheme,
+  onJoinRoom ,//new
+  joinableRooms,
 }) => {
   const [showCreateRoom, setShowCreateRoom] = useState(false);
   const [newRoomName, setNewRoomName] = useState('');
 
+  //new
+// const joinedSet = new Set(joinedRooms);
+// const joinableRooms = rooms.filter(r => !joinedSet.has(r));
+//new
+
   const handleCreateRoom = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedName = newRoomName.trim().toLowerCase().replace(/\s+/g, '-');
-    if (trimmedName && !rooms.includes(trimmedName)) {
-      onCreateRoom(trimmedName);
-      setNewRoomName('');
-      setShowCreateRoom(false);
-    }
+    //new
+     if (!trimmedName) return;
+      if (rooms.includes(trimmedName)) {
+    alert(`Room "${trimmedName}" already exists.`);
+  } else {
+    onCreateRoom(trimmedName);
+    setNewRoomName('');
+    setShowCreateRoom(false);
+  }
+
+    // if (trimmedName && !rooms.includes(trimmedName)) {
+    //   onCreateRoom(trimmedName);
+    //   setNewRoomName('');
+    //   setShowCreateRoom(false);
+    // }
   };
+  
 
   return (
     <div className="w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col h-full">
@@ -113,30 +135,57 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             ))}
           </div>
+
+           {/* ✅ Joinable rooms should be INSIDE here */}
+  {joinableRooms.length > 0 && (
+    <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4">
+      <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-2">
+        Joinable Rooms
+      </h2>
+      <div className="space-y-1">
+        {joinableRooms.map((room) => (
+          <button
+            key={room}
+            onClick={() => {onJoinRoom(room);onRoomChange(room)}}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
+            <Hash className="w-4 h-4" />
+            <span className="font-medium">{room}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )}
         </div>
 
         {/* Current Room Users */}
-        {currentRoom && roomUsers.length > 0 && (
-          <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-2 mb-3">
-              <Users className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                Online ({roomUsers.length})
-              </h3>
-            </div>
-            <div className="space-y-2">
-              {roomUsers.map((user) => (
-                <div
-                  key={user}
-                  className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300"
-                >
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span>{user}</span>
-                </div>
-              ))}
-            </div>
+      {currentRoom && roomUsers.length > 0 && (
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-2 mb-3">
+            <Users className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              Online ({roomUsers.length})
+            </h3>
           </div>
-        )}
+          <div className="space-y-2">
+            {roomUsers.map((user) => (
+              <div
+                key={user}
+                className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300"
+              >
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span>{user}</span>
+                {/* Show "You" indicator for current user */}
+                {user === username && (
+                  <span className="text-xs text-gray-400 dark:text-gray-500">
+                    (you)
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );

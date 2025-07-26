@@ -1,38 +1,35 @@
-import { WebSocketServer,WebSocket } from 'ws';
+import { WebSocketServer, WebSocket } from 'ws';
 
 const wss = new WebSocketServer({ port: 3001 });
-const servers:WebSocket[]=[];
+const servers: WebSocket[] = [];
 
+wss.on('connection', (ws) => {
+  console.log('🔌 New server connected');
+  servers.push(ws);
 
-wss.on('connection', function connection(ws) {
-  ws.on('error', console.error);
-servers.push(ws);
-  ws.on('message', function message(data:string) {
-    const message = JSON.parse(data);
-    // Handle different message types
-  switch(message.type) {
-    case 'chat':
-    case 'user-joined':
-    case 'user-left':
-      // Broadcast to all connected servers
-      servers.filter(socket => socket !== ws).forEach(socket => {
-        socket.send(JSON.stringify(message));
-      });
-      break;
-    default:
-      console.log('Unknown message type:', message.type);
-  }
-        // servers.filter(socket => socket!=ws).map(socket=>{
-        //     socket.send(data);
-        // })
-        servers
-      .filter(socket => socket !== ws) // 💡 exclude sender
-      .forEach(socket => {
-        socket.send(data);
-      });
+  ws.on('error', (error) => {
+    console.error('❌ Server connection error:', error);
   });
 
-//   ws.send('you are connected');
-});
+ws.on('message', (data) => {
+  try {
+    const jsonStr = data.toString(); // Safely convert Buffer or Blob to string
+    // console.log(`🔁 Relaying message: ${jsonStr}`);
 
-//relayer websocket server helps broadcast messages to all participants in a room
+    // Broadcast to all other servers
+    servers.forEach(server => {
+      if (server.readyState === WebSocket.OPEN) {
+        server.send(jsonStr); // Always send stringified JSON
+      }
+    });
+  }catch (e) {
+      console.error('❌ Relaying error:', e);
+    }
+  });
+
+  ws.on('close', () => {
+    console.log('🔌 Server disconnected');
+    const index = servers.indexOf(ws);
+    if (index !== -1) servers.splice(index, 1);
+  });
+});

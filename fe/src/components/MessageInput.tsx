@@ -69,12 +69,25 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }, []);
 
   const addEmoji = (emoji: any) => {
-    const cursorPosition = textareaRef.current?.selectionStart || 0;
-    const newText =
-      message.slice(0, cursorPosition) + emoji.native + message.slice(cursorPosition);
-    setMessage(newText);
+  const cursorPosition = textareaRef.current?.selectionStart || 0;
+  const newText =
+    message.slice(0, cursorPosition) + emoji.native + message.slice(cursorPosition);
+
+  setMessage(newText);
+
+  setTimeout(() => {
+    // Reset emoji picker
     setShowEmojiPicker(false);
-  };
+
+    // Restore focus & cursor position
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.selectionEnd = cursorPosition + emoji.native.length;
+      adjustTextareaHeight(); // Fix height after emoji add
+    }
+  }, 0);
+};
+
 
   return (
     <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4">

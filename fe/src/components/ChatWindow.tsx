@@ -17,7 +17,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  const roomMessages = messages.filter(msg => msg.room === currentRoom);
+  // Normalize room names to lowercase for consistent comparison
+  const normalizedRoom = currentRoom.toLowerCase();
+  const roomMessages = messages.filter(msg => 
+    msg.room.toLowerCase() === normalizedRoom
+  );
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
