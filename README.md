@@ -101,7 +101,7 @@ The frontend should:
 
 ## 🔮 Web3: Nibiru Integration (Future Scope)
 
-You can integrate [Nibiru Wallet](https://docs.nibiru.fi) to add web3 features:
+We will try to integrate [Nibiru Wallet](https://docs.nibiru.fi) to add web3 features:
 
 ### 🔐 Wallet-Based Login
 
